@@ -30,12 +30,15 @@ runs:
   - name: Migration
     shell: bash
     run: |
-      DEPLOYMENT=${{ inputs.repository-name }}
+      DEPLOYMENT=${{ inputs.app-name }}
       NAMESPACE=${{ inputs.namespace }}
+      ECR_REPO=${{ inputs.ecr-repository-name }}
+      IMAGE_TAG=${{ inputs.image-tag }}
+      REGION=${{ inputs.region }}
+      IMAGE=${{ inputs.docker-host }}/${{ inputs.ecr-repository-name }}
 
       cd kubernetes/deploy
-      IMAGE=${{ inputs.docker-host }}/${{ inputs.repository-name }}
-      kustomize edit set image fake-image=${IMAGE}:${{ inputs.image-tag }}
+      kustomize edit set image fake-image=${IMAGE}:$IMAGE_TAG
       kustomize build . | kubectl apply -f - -n $NAMESPACE
       if ! kubectl -n $NAMESPACE rollout status deployment/$DEPLOYMENT -w --timeout=180s ; then
         echo "$DEPLOYMENT rollout check failed:"
@@ -48,5 +51,5 @@ runs:
         exit 1
       fi
       # Update the last-deployed tag to be used in dev environments
-      MANIFEST=$(aws ecr batch-get-image --region ${{ inputs.region }} --repository-name ${{ inputs.repository-name }} --image-ids imageTag=${{ inputs.image-tag }} --query 'images[].imageManifest' --output text)
-      aws ecr put-image --region ${{ inputs.region }} --repository-name ${{ inputs.repository-name }} --image-tag last-deployed --image-manifest "$MANIFEST"
+      MANIFEST=$(aws ecr batch-get-image --region $REGION --repository-name $ECR_REPO --image-ids imageTag=$IMAGE_TAG --query 'images[].imageManifest' --output text)
+      aws ecr put-image --region $REGION --repository-name $ECR_REPO --image-tag last-deployed --image-manifest "$MANIFEST"
